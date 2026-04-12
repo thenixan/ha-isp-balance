@@ -114,6 +114,16 @@ def _build_cookie_header(cookies: dict[str, str]) -> str:
     return "; ".join(f"{k}={v}" for k, v in cookies.items())
 
 
+def _new_session() -> aiohttp.ClientSession:
+    """Create a private session with DummyCookieJar.
+
+    HA's shared session uses a real CookieJar that intercepts Set-Cookie
+    headers, causing resp.cookies to be empty. We need our own session
+    to reliably extract cookies from responses.
+    """
+    return aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar())
+
+
 # ---------------------------------------------------------------------------
 # Provider implementation
 # ---------------------------------------------------------------------------
@@ -131,49 +141,49 @@ class LbWebProvider(ISPProvider):
 
     async def authenticate(
         self,
-        session: aiohttp.ClientSession,
         username: str,
         password: str,
     ) -> AuthResult:
-        headers = {"User-Agent": USER_AGENT}
+        async with _new_session() as session:
+            headers = {"User-Agent": USER_AGENT}
 
-        # Step 1: GET login page — obtain CSRF token and initial cookies.
-        async with session.get(
-            self._endpoints.sign_in, headers=headers, allow_redirects=False
-        ) as resp:
-            if resp.status >= 400:
-                raise ConnectionError(
-                    f"ISP portal returned HTTP {resp.status}"
-                )
+            # Step 1: GET login page — obtain CSRF token and initial cookies.
+            async with session.get(
+                self._endpoints.sign_in, headers=headers, allow_redirects=False
+            ) as resp:
+                if resp.status >= 400:
+                    raise ConnectionError(
+                        f"ISP portal returned HTTP {resp.status}"
+                    )
 
-            cookies: dict[str, str] = {}
-            csrf_token: str | None = None
+                cookies: dict[str, str] = {}
+                csrf_token: str | None = None
 
-            for cookie in resp.cookies.values():
-                cookies[cookie.key] = cookie.value
-                if cookie.key == "YII_CSRF_TOKEN":
-                    csrf_token = unquote(cookie.value)
+                for cookie in resp.cookies.values():
+                    cookies[cookie.key] = cookie.value
+                    if cookie.key == "YII_CSRF_TOKEN":
+                        csrf_token = unquote(cookie.value)
 
-        # Step 2: POST login form with credentials and decoded CSRF token.
-        form_data: dict[str, str] = {
-            "LoginForm[login]": username,
-            "LoginForm[password]": password,
-            "yt0": "Войти",
-        }
-        if csrf_token is not None:
-            form_data["YII_CSRF_TOKEN"] = csrf_token
+            # Step 2: POST login form with credentials and decoded CSRF token.
+            form_data: dict[str, str] = {
+                "LoginForm[login]": username,
+                "LoginForm[password]": password,
+                "yt0": "Войти",
+            }
+            if csrf_token is not None:
+                form_data["YII_CSRF_TOKEN"] = csrf_token
 
-        async with session.post(
-            self._endpoints.sign_in,
-            data=form_data,
-            headers={**headers, "Cookie": _build_cookie_header(cookies)},
-            allow_redirects=False,
-        ) as resp:
-            if 400 <= resp.status < 500:
-                raise AuthenticationError("Invalid credentials")
+            async with session.post(
+                self._endpoints.sign_in,
+                data=form_data,
+                headers={**headers, "Cookie": _build_cookie_header(cookies)},
+                allow_redirects=False,
+            ) as resp:
+                if 400 <= resp.status < 500:
+                    raise AuthenticationError("Invalid credentials")
 
-            for cookie in resp.cookies.values():
-                cookies[cookie.key] = cookie.value
+                for cookie in resp.cookies.values():
+                    cookies[cookie.key] = cookie.value
 
         return AuthResult(
             auth_token=json.dumps(cookies, separators=(",", ":")),
@@ -182,7 +192,6 @@ class LbWebProvider(ISPProvider):
 
     async def fetch_balance(
         self,
-        session: aiohttp.ClientSession,
         auth_token: str,
     ) -> BalanceData:
         cookies: dict[str, str] = json.loads(auth_token)
@@ -191,21 +200,22 @@ class LbWebProvider(ISPProvider):
             "Cookie": _build_cookie_header(cookies),
         }
 
-        async with session.get(
-            self._endpoints.dashboard, headers=headers, allow_redirects=False
-        ) as resp:
-            if 300 <= resp.status < 400:
-                location = resp.headers.get("Location", "")
-                if "site/login" in location:
-                    raise AuthenticationError("Session expired")
-                raise ConnectionError(f"Unexpected redirect to {location}")
+        async with _new_session() as session:
+            async with session.get(
+                self._endpoints.dashboard, headers=headers, allow_redirects=False
+            ) as resp:
+                if 300 <= resp.status < 400:
+                    location = resp.headers.get("Location", "")
+                    if "site/login" in location:
+                        raise AuthenticationError("Session expired")
+                    raise ConnectionError(f"Unexpected redirect to {location}")
 
-            if resp.status >= 400:
-                raise ConnectionError(
-                    f"Dashboard returned HTTP {resp.status}"
-                )
+                if resp.status >= 400:
+                    raise ConnectionError(
+                        f"Dashboard returned HTTP {resp.status}"
+                    )
 
-            html = await resp.text()
+                html = await resp.text()
 
         return self._parse_dashboard(html)
 

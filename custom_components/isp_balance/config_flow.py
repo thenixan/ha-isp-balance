@@ -8,7 +8,6 @@ import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
@@ -92,11 +91,9 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             assert self._provider_id is not None
             provider = get_provider(self._provider_id)
-            session = async_get_clientsession(self.hass)
 
             try:
                 auth_result = await provider.authenticate(
-                    session,
                     user_input[CONF_USERNAME],
                     user_input[CONF_PASSWORD],
                 )
@@ -145,11 +142,9 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             assert self._provider_id is not None
             provider = get_provider(self._provider_id)
-            session = async_get_clientsession(self.hass)
 
             try:
                 auth_result = await provider.authenticate(
-                    session,
                     reauth_entry.data[CONF_USERNAME],
                     user_input[CONF_PASSWORD],
                 )

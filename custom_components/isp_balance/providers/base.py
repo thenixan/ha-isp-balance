@@ -5,8 +5,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-import aiohttp
-
 
 class AuthenticationError(Exception):
     """Raised when authentication fails or a session expires."""
@@ -46,14 +44,13 @@ class BalanceData:
 class ISPProvider(ABC):
     """Abstract interface for ISP balance providers.
 
-    Implementations handle authentication against a specific ISP billing
-    portal and scraping of account data from the authenticated zone.
+    Implementations manage their own HTTP sessions to avoid interference
+    with HA's shared session cookie jar.
     """
 
     @abstractmethod
     async def authenticate(
         self,
-        session: aiohttp.ClientSession,
         username: str,
         password: str,
     ) -> AuthResult:
@@ -69,7 +66,6 @@ class ISPProvider(ABC):
     @abstractmethod
     async def fetch_balance(
         self,
-        session: aiohttp.ClientSession,
         auth_token: str,
     ) -> BalanceData:
         """Fetch current balance using a previously obtained auth_token.

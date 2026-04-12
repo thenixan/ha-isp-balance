@@ -6,12 +6,9 @@ import logging
 import random
 from datetime import timedelta
 
-import aiohttp
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -66,14 +63,13 @@ class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
 
     async def _async_update_data(self) -> BalanceData:
         """Fetch balance from the ISP provider."""
-        session = async_get_clientsession(self.hass)
         auth_token = self.config_entry.data[CONF_AUTH_TOKEN]
 
         try:
-            data = await self._provider.fetch_balance(session, auth_token)
+            data = await self._provider.fetch_balance(auth_token)
         except AuthenticationError:
             _LOGGER.debug("Session expired, attempting automatic re-authentication")
-            data = await self._reauthenticate_and_retry(session)
+            data = await self._reauthenticate_and_retry()
         except Exception as err:
             raise UpdateFailed(f"Error fetching balance: {err}") from err
 
@@ -82,15 +78,13 @@ class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
 
         return data
 
-    async def _reauthenticate_and_retry(
-        self, session: aiohttp.ClientSession
-    ) -> BalanceData:
+    async def _reauthenticate_and_retry(self) -> BalanceData:
         """Re-authenticate with stored credentials, update the config entry, and retry."""
         username = self.config_entry.data[CONF_USERNAME]
         password = self.config_entry.data[CONF_PASSWORD]
 
         try:
-            auth_result = await self._provider.authenticate(session, username, password)
+            auth_result = await self._provider.authenticate(username, password)
         except AuthenticationError as err:
             # Credentials themselves are invalid — require manual reauth
             raise ConfigEntryAuthFailed(
@@ -110,12 +104,13 @@ class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
         _LOGGER.debug("Re-authentication successful, retrying balance fetch")
 
         try:
-            return await self._provider.fetch_balance(
-                session, auth_result.auth_token
-            )
+            return await self._provider.fetch_balance(auth_result.auth_token)
         except AuthenticationError as err:
-            raise ConfigEntryAuthFailed(
-                "Fetch failed immediately after re-authentication"
+            # Re-auth succeeded (credentials are valid) but the new session
+            # isn't active yet — transient server-side issue.
+            # Retry on the next polling interval instead of locking the user out.
+            raise UpdateFailed(
+                "Session not yet active after re-authentication, will retry"
             ) from err
         except Exception as err:
             raise UpdateFailed(
