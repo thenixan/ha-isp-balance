@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_PROVIDER, DOMAIN
+from .const import CONF_PROVIDER, DOMAIN, PROVIDER_DISPLAY_NAMES, ProviderId
 from .coordinator import ISPBalanceCoordinator
 
 
@@ -27,37 +32,54 @@ class ISPBalanceSensor(CoordinatorEntity[ISPBalanceCoordinator], SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "balance"
-    _attr_icon = "mdi:currency-rub"
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_state_class = SensorStateClass.TOTAL
 
     def __init__(
         self,
         coordinator: ISPBalanceCoordinator,
         entry: ConfigEntry,
     ) -> None:
-        """Initialize the sensor."""
         super().__init__(coordinator)
-        self._entry = entry
+
+        provider_id = ProviderId(entry.data[CONF_PROVIDER])
+        display_name = PROVIDER_DISPLAY_NAMES[provider_id]
+
         self._attr_unique_id = f"{entry.entry_id}_balance"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.title,
+            manufacturer=display_name,
+            model="LbWeb",
+        )
 
     @property
-    def native_value(self) -> str | None:
-        """Return the current balance as scraped from the portal."""
+    def native_value(self) -> float | None:
+        """Return the current balance."""
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.balance
 
     @property
-    def extra_state_attributes(self) -> dict | None:
-        """Return provider-specific extra data as attributes."""
-        if self.coordinator.data is None or not self.coordinator.data.extra:
+    def native_unit_of_measurement(self) -> str | None:
+        """Return the currency code (e.g. 'RUB')."""
+        if self.coordinator.data is None:
             return None
-        return self.coordinator.data.extra
+        return self.coordinator.data.currency
 
     @property
-    def device_info(self):
-        """Group entities under a device per config entry."""
-        return {
-            "identifiers": {(DOMAIN, self._entry.entry_id)},
-            "name": self._entry.title,
-            "manufacturer": self._entry.data.get(CONF_PROVIDER, "ISP"),
-        }
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        """Expose overdraft, operator, and notification as entity attributes."""
+        data = self.coordinator.data
+        if data is None:
+            return None
+
+        attrs: dict[str, str] = {}
+        if data.overdraft is not None:
+            attrs["overdraft"] = data.overdraft
+        if data.operator is not None:
+            attrs["operator"] = data.operator
+        if data.notification is not None:
+            attrs["notification"] = data.notification
+
+        return attrs or None

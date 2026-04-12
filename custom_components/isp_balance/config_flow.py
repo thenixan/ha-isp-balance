@@ -9,53 +9,101 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 
-from .const import CONF_AUTH_TOKEN, CONF_PASSWORD, CONF_PROVIDER, CONF_USERNAME, DOMAIN
-from .providers import get_provider, get_provider_choices
+from .const import (
+    CONF_AUTH_TOKEN,
+    CONF_PASSWORD,
+    CONF_PROVIDER,
+    CONF_USERNAME,
+    DOMAIN,
+    PROVIDER_DISPLAY_NAMES,
+    ProviderId,
+)
+from .providers import get_provider
 from .providers.base import AuthenticationError
+
+_PROVIDER_OPTIONS = [
+    SelectOptionDict(value=pid.value, label=PROVIDER_DISPLAY_NAMES[pid])
+    for pid in ProviderId
+]
+
+_PROVIDER_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PROVIDER): SelectSelector(
+            SelectSelectorConfig(
+                options=_PROVIDER_OPTIONS,
+                mode=SelectSelectorMode.DROPDOWN,
+            )
+        ),
+    }
+)
+
+_CREDENTIALS_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_USERNAME): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.TEXT)
+        ),
+        vol.Required(CONF_PASSWORD): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
+    }
+)
+
+_REAUTH_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_PASSWORD): TextSelector(
+            TextSelectorConfig(type=TextSelectorType.PASSWORD)
+        ),
+    }
+)
 
 
 class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Config flow for ISP Balance."""
+    """Multi-step config flow: select provider -> enter credentials -> validate."""
 
     VERSION = 1
 
     def __init__(self) -> None:
-        """Initialize the config flow."""
-        self._provider_id: str | None = None
+        self._provider_id: ProviderId | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Step 1: Pick a provider."""
+        """Step 1: Pick a provider from the dropdown."""
         if user_input is not None:
-            self._provider_id = user_input[CONF_PROVIDER]
+            self._provider_id = ProviderId(user_input[CONF_PROVIDER])
             return await self.async_step_credentials()
 
-        choices = get_provider_choices()
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_PROVIDER): vol.In(choices),
-                }
-            ),
+            data_schema=_PROVIDER_SCHEMA,
         )
 
     async def async_step_credentials(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Step 2: Enter credentials, validate, and save."""
+        """Step 2: Enter credentials, validate against the ISP portal, save."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            assert self._provider_id is not None
             provider = get_provider(self._provider_id)
             session = async_get_clientsession(self.hass)
 
             try:
                 auth_result = await provider.authenticate(
-                    session, user_input[CONF_USERNAME], user_input[CONF_PASSWORD]
+                    session,
+                    user_input[CONF_USERNAME],
+                    user_input[CONF_PASSWORD],
                 )
             except AuthenticationError:
                 errors["base"] = "invalid_auth"
@@ -68,10 +116,11 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await self.async_set_unique_id(unique_id)
                 self._abort_if_unique_id_configured()
 
+                display_name = PROVIDER_DISPLAY_NAMES[self._provider_id]
                 return self.async_create_entry(
-                    title=f"{auth_result.account_name} ({provider.provider_name()})",
+                    title=f"{auth_result.account_name} ({display_name})",
                     data={
-                        CONF_PROVIDER: self._provider_id,
+                        CONF_PROVIDER: self._provider_id.value,
                         CONF_USERNAME: user_input[CONF_USERNAME],
                         CONF_PASSWORD: user_input[CONF_PASSWORD],
                         CONF_AUTH_TOKEN: auth_result.auth_token,
@@ -80,36 +129,29 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="credentials",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_USERNAME): TextSelector(
-                        TextSelectorConfig(type=TextSelectorType.TEXT)
-                    ),
-                    vol.Required(CONF_PASSWORD): TextSelector(
-                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
-                    ),
-                }
-            ),
+            data_schema=_CREDENTIALS_SCHEMA,
             errors=errors,
         )
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]
     ) -> config_entries.ConfigFlowResult:
-        """Handle re-authentication when token expires."""
-        self._provider_id = entry_data[CONF_PROVIDER]
+        """Handle re-authentication when the stored session expires."""
+        self._provider_id = ProviderId(entry_data[CONF_PROVIDER])
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Re-auth: re-enter password."""
+        """Re-auth: re-enter password, re-validate, update config entry."""
         errors: dict[str, str] = {}
         reauth_entry = self._get_reauth_entry()
 
         if user_input is not None:
+            assert self._provider_id is not None
             provider = get_provider(self._provider_id)
             session = async_get_clientsession(self.hass)
+
             try:
                 auth_result = await provider.authenticate(
                     session,
@@ -131,12 +173,6 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reauth_confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_PASSWORD): TextSelector(
-                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
-                    ),
-                }
-            ),
+            data_schema=_REAUTH_SCHEMA,
             errors=errors,
         )

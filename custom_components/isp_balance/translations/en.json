@@ -5,11 +5,14 @@
         "title": "Select ISP Provider",
         "data": {
           "provider": "Provider"
+        },
+        "data_description": {
+          "provider": "Choose your internet service provider from the list."
         }
       },
       "credentials": {
-        "title": "Enter Credentials",
-        "description": "Provide your ISP portal login credentials.",
+        "title": "Authentication",
+        "description": "Enter your ISP billing portal credentials.",
         "data": {
           "username": "Username",
           "password": "Password"
@@ -25,7 +28,7 @@
     },
     "error": {
       "invalid_auth": "Invalid credentials. Please check your username and password.",
-      "cannot_connect": "Unable to connect to the ISP portal.",
+      "cannot_connect": "Unable to connect to the ISP billing portal.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {

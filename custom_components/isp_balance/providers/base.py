@@ -1,10 +1,9 @@
-"""Base provider interface for ISP balance fetching."""
+"""Base provider interface and domain types for ISP balance fetching."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 import aiohttp
 
@@ -13,47 +12,43 @@ class AuthenticationError(Exception):
     """Raised when authentication fails or a session expires."""
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class AuthResult:
-    """Result of a successful authentication."""
+    """Result of a successful provider authentication."""
 
     auth_token: str
-    """Opaque reusable credential — JSON-encoded cookies dict for LbWeb providers."""
+    """Opaque reusable credential (JSON-encoded cookies, bearer token, etc.)."""
 
     account_name: str
     """Human-readable account label for the config entry title."""
 
-    extra: dict[str, Any] = field(default_factory=dict)
-    """Provider-specific metadata to persist alongside the token."""
 
-
-@dataclass
+@dataclass(frozen=True, slots=True)
 class BalanceData:
-    """Fetched balance information."""
+    """Fetched account data from the ISP billing portal."""
 
-    balance: str
-    """Current account balance (as displayed, e.g. '1 234.56 руб.')."""
+    balance: float
+    """Current account balance as a numeric value."""
 
     currency: str
     """ISO 4217 currency code, e.g. 'RUB'."""
 
-    account_id: str | None = None
-    extra: dict[str, Any] = field(default_factory=dict)
-    """Additional scraped data (overdraft, operator, notification, etc.)."""
+    overdraft: str | None = None
+    """Credit limit / overdraft text, if available."""
+
+    operator: str | None = None
+    """Operator or company name, if available."""
+
+    notification: str | None = None
+    """Portal notification message, if any."""
 
 
 class ISPProvider(ABC):
-    """Abstract base class for ISP balance providers."""
+    """Abstract interface for ISP balance providers.
 
-    @staticmethod
-    @abstractmethod
-    def provider_id() -> str:
-        """Unique slug identifying this provider, e.g. 'nts_center'."""
-
-    @staticmethod
-    @abstractmethod
-    def provider_name() -> str:
-        """Human-readable name shown in the config flow dropdown."""
+    Implementations handle authentication against a specific ISP billing
+    portal and scraping of account data from the authenticated zone.
+    """
 
     @abstractmethod
     async def authenticate(

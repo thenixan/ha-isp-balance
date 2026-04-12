@@ -1,7 +1,24 @@
 """Constants for the ISP Balance integration."""
 
+from enum import StrEnum
+
+from homeassistant.const import Platform
+
 DOMAIN = "isp_balance"
-PLATFORMS = ["sensor"]
+PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+
+class ProviderId(StrEnum):
+    """Known ISP provider identifiers."""
+
+    NTS_CENTER = "nts_center"
+    PARUS_TELECOM = "parus_telecom"
+
+
+PROVIDER_DISPLAY_NAMES: dict[ProviderId, str] = {
+    ProviderId.NTS_CENTER: "NTS Center",
+    ProviderId.PARUS_TELECOM: "Parus Telecom",
+}
 
 # Config entry data keys
 CONF_PROVIDER = "provider"

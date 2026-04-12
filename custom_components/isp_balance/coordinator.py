@@ -10,7 +10,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 
 from .const import (
     CONF_AUTH_TOKEN,
@@ -18,6 +21,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
     UPDATE_JITTER_MINUTES,
+    ProviderId,
 )
 from .providers import get_provider
 from .providers.base import AuthenticationError, BalanceData
@@ -34,14 +38,13 @@ def _jittered_interval() -> timedelta:
 
 
 class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
-    """Coordinator that fetches ISP balance with hourly jitter."""
+    """Coordinator that fetches ISP balance on a jittered hourly schedule."""
 
     config_entry: ConfigEntry
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        """Initialize the coordinator."""
-        self._entry = entry
-        self._provider = get_provider(entry.data[CONF_PROVIDER])
+        provider_id = ProviderId(entry.data[CONF_PROVIDER])
+        self._provider = get_provider(provider_id)
 
         super().__init__(
             hass,
@@ -54,7 +57,7 @@ class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
     async def _async_update_data(self) -> BalanceData:
         """Fetch balance from the ISP provider."""
         session = async_get_clientsession(self.hass)
-        auth_token = self._entry.data[CONF_AUTH_TOKEN]
+        auth_token = self.config_entry.data[CONF_AUTH_TOKEN]
 
         try:
             data = await self._provider.fetch_balance(session, auth_token)
@@ -63,7 +66,7 @@ class ISPBalanceCoordinator(DataUpdateCoordinator[BalanceData]):
         except Exception as err:
             raise UpdateFailed(f"Error fetching balance: {err}") from err
 
-        # Re-randomize interval for the next cycle
+        # Re-randomize interval so successive polls don't synchronize
         self.update_interval = _jittered_interval()
 
         return data
