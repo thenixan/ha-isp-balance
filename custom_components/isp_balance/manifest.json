@@ -1,7 +1,7 @@
 {
   "domain": "isp_balance",
   "name": "ISP Balance",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "codeowners": [],
   "config_flow": true,
   "documentation": "https://github.com/thenixan/ha-isp-balance",
