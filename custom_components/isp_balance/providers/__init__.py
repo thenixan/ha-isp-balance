@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from .base import ISPProvider
-from .example_isp import ExampleISPProvider
+from .nts_center import NTSCenterProvider
+from .parus_telecom import ParusTelecomProvider
 
 PROVIDER_REGISTRY: dict[str, type[ISPProvider]] = {}
 
@@ -25,4 +26,5 @@ def get_provider_choices() -> dict[str, str]:
 
 
 # Register bundled providers
-register_provider(ExampleISPProvider)
+register_provider(NTSCenterProvider)
+register_provider(ParusTelecomProvider)

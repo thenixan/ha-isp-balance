@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -30,9 +26,8 @@ class ISPBalanceSensor(CoordinatorEntity[ISPBalanceCoordinator], SensorEntity):
     """Sensor showing the ISP account balance."""
 
     _attr_has_entity_name = True
-    _attr_device_class = SensorDeviceClass.MONETARY
-    _attr_state_class = SensorStateClass.TOTAL
     _attr_translation_key = "balance"
+    _attr_icon = "mdi:currency-rub"
 
     def __init__(
         self,
@@ -45,18 +40,11 @@ class ISPBalanceSensor(CoordinatorEntity[ISPBalanceCoordinator], SensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_balance"
 
     @property
-    def native_value(self) -> float | None:
-        """Return the current balance."""
+    def native_value(self) -> str | None:
+        """Return the current balance as scraped from the portal."""
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.balance
-
-    @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Return the currency code."""
-        if self.coordinator.data is None:
-            return None
-        return self.coordinator.data.currency
 
     @property
     def extra_state_attributes(self) -> dict | None:

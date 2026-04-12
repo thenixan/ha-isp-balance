@@ -18,7 +18,7 @@ class AuthResult:
     """Result of a successful authentication."""
 
     auth_token: str
-    """Opaque reusable credential (cookie, bearer token, session ID)."""
+    """Opaque reusable credential — JSON-encoded cookies dict for LbWeb providers."""
 
     account_name: str
     """Human-readable account label for the config entry title."""
@@ -31,15 +31,15 @@ class AuthResult:
 class BalanceData:
     """Fetched balance information."""
 
-    balance: float
-    """Current account balance."""
+    balance: str
+    """Current account balance (as displayed, e.g. '1 234.56 руб.')."""
 
     currency: str
-    """ISO 4217 currency code, e.g. 'USD', 'UAH'."""
+    """ISO 4217 currency code, e.g. 'RUB'."""
 
     account_id: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
-    """Additional scraped data (plan name, due date, etc.)."""
+    """Additional scraped data (overdraft, operator, notification, etc.)."""
 
 
 class ISPProvider(ABC):
@@ -48,7 +48,7 @@ class ISPProvider(ABC):
     @staticmethod
     @abstractmethod
     def provider_id() -> str:
-        """Unique slug identifying this provider, e.g. 'example_isp'."""
+        """Unique slug identifying this provider, e.g. 'nts_center'."""
 
     @staticmethod
     @abstractmethod
