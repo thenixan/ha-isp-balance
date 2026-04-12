@@ -9,6 +9,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .const import CONF_AUTH_TOKEN, CONF_PASSWORD, CONF_PROVIDER, CONF_USERNAME, DOMAIN
 from .providers import get_provider, get_provider_choices
@@ -81,8 +82,12 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="credentials",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_USERNAME): str,
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_USERNAME): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.TEXT)
+                    ),
+                    vol.Required(CONF_PASSWORD): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
                 }
             ),
             errors=errors,
@@ -128,7 +133,9 @@ class ISPBalanceConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_PASSWORD): str,
+                    vol.Required(CONF_PASSWORD): TextSelector(
+                        TextSelectorConfig(type=TextSelectorType.PASSWORD)
+                    ),
                 }
             ),
             errors=errors,
