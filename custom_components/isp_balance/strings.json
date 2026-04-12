@@ -1,0 +1,42 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select ISP Provider",
+        "data": {
+          "provider": "Provider"
+        }
+      },
+      "credentials": {
+        "title": "Enter Credentials",
+        "description": "Provide your ISP portal login credentials.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate",
+        "description": "Your session has expired. Please re-enter your password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid credentials. Please check your username and password.",
+      "cannot_connect": "Unable to connect to the ISP portal.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This account is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "balance": {
+        "name": "Account Balance"
+      }
+    }
+  }
+}
