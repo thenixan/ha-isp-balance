@@ -35,6 +35,14 @@
       "already_configured": "Этот аккаунт уже настроен."
     }
   },
+  "selector": {
+    "provider": {
+      "options": {
+        "nts_center": "Новые Технологии Связи",
+        "parus_telecom": "Парус Телеком"
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "balance": {

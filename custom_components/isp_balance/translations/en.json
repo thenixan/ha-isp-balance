@@ -35,6 +35,14 @@
       "already_configured": "This account is already configured."
     }
   },
+  "selector": {
+    "provider": {
+      "options": {
+        "nts_center": "NTS Center",
+        "parus_telecom": "Parus Telecom"
+      }
+    }
+  },
   "entity": {
     "sensor": {
       "balance": {

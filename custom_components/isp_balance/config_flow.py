@@ -10,7 +10,6 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
-    SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -31,16 +30,12 @@ from .const import (
 from .providers import get_provider
 from .providers.base import AuthenticationError
 
-_PROVIDER_OPTIONS = [
-    SelectOptionDict(value=pid.value, label=PROVIDER_DISPLAY_NAMES[pid])
-    for pid in ProviderId
-]
-
 _PROVIDER_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_PROVIDER): SelectSelector(
             SelectSelectorConfig(
-                options=_PROVIDER_OPTIONS,
+                options=[pid.value for pid in ProviderId],
+                translation_key=CONF_PROVIDER,
                 mode=SelectSelectorMode.DROPDOWN,
             )
         ),
