@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class AuthenticationError(Exception):
@@ -39,6 +39,14 @@ class BalanceData:
 
     notification: str | None = None
     """Portal notification message, if any."""
+
+    extra: dict[str, str] = field(default_factory=dict)
+    """Provider-specific extras, surfaced verbatim as sensor attributes.
+
+    Keys must be stable snake_case identifiers — they become attribute names
+    that users write automations against. Never put personal data here; the
+    values land in the state machine and the recorder database.
+    """
 
 
 class ISPProvider(ABC):

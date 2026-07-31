@@ -13,11 +13,20 @@ class ProviderId(StrEnum):
 
     NTS_CENTER = "nts_center"
     PARUS_TELECOM = "parus_telecom"
+    RSI_NET = "rsi_net"
 
 
 PROVIDER_DISPLAY_NAMES: dict[ProviderId, str] = {
     ProviderId.NTS_CENTER: "NTS Center",
     ProviderId.PARUS_TELECOM: "Parus Telecom",
+    ProviderId.RSI_NET: "RSI-Net",
+}
+
+# Billing platform behind each provider, surfaced as the device model.
+PROVIDER_BILLING_SYSTEMS: dict[ProviderId, str] = {
+    ProviderId.NTS_CENTER: "LbWeb",
+    ProviderId.PARUS_TELECOM: "LbWeb",
+    ProviderId.RSI_NET: "Joomla",
 }
 
 # Config entry data keys
