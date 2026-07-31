@@ -39,7 +39,8 @@
     "provider": {
       "options": {
         "nts_center": "Новые Технологии Связи",
-        "parus_telecom": "Парус Телеком"
+        "parus_telecom": "Парус Телеком",
+        "rsi_net": "РамСвязьИнвест (РСИ)"
       }
     }
   },

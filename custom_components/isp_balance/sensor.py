@@ -13,7 +13,13 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_PROVIDER, DOMAIN, PROVIDER_DISPLAY_NAMES, ProviderId
+from .const import (
+    CONF_PROVIDER,
+    DOMAIN,
+    PROVIDER_BILLING_SYSTEMS,
+    PROVIDER_DISPLAY_NAMES,
+    ProviderId,
+)
 from .coordinator import ISPBalanceCoordinator
 
 
@@ -50,7 +56,7 @@ class ISPBalanceSensor(CoordinatorEntity[ISPBalanceCoordinator], SensorEntity):
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.title,
             manufacturer=display_name,
-            model="LbWeb",
+            model=PROVIDER_BILLING_SYSTEMS[provider_id],
         )
 
     @property
@@ -81,5 +87,6 @@ class ISPBalanceSensor(CoordinatorEntity[ISPBalanceCoordinator], SensorEntity):
             attrs["operator"] = data.operator
         if data.notification is not None:
             attrs["notification"] = data.notification
+        attrs.update(data.extra)
 
         return attrs or None

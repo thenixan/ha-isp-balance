@@ -39,7 +39,8 @@
     "provider": {
       "options": {
         "nts_center": "NTS Center",
-        "parus_telecom": "Parus Telecom"
+        "parus_telecom": "Parus Telecom",
+        "rsi_net": "RSI-Net"
       }
     }
   },
