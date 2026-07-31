@@ -2,7 +2,7 @@
   "domain": "isp_balance",
   "name": "ISP Balance",
   "version": "0.3.0",
-  "codeowners": [],
+  "codeowners": ["@thenixan"],
   "config_flow": true,
   "documentation": "https://github.com/thenixan/ha-isp-balance",
   "issue_tracker": "https://github.com/thenixan/ha-isp-balance/issues",
