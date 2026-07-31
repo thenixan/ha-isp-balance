@@ -8,8 +8,9 @@ Custom Home Assistant integration that fetches and displays your ISP account bal
 |----------|---------------|------------|
 | NTS Center | LbWeb | `stat.nts.center/lbweb-client/` |
 | Parus Telecom | LbWeb | `cabinet.parustelecom.ru` |
+| RSI-Net (РамСвязьИнвест) | Joomla | `lk.rsi-net.ru` |
 
-Both providers use the same [LbWeb](https://www.lanbilling.ru/) billing platform — only the portal URLs differ.
+NTS Center and Parus Telecom share the [LbWeb](https://www.lanbilling.ru/) billing platform — only the portal URLs differ. RSI-Net runs a Joomla subscriber cabinet instead, with its own authentication flow and page structure.
 
 ## Features
 
@@ -50,7 +51,9 @@ Copy `custom_components/isp_balance/` into your Home Assistant config directory:
         └── providers/
             ├── __init__.py
             ├── base.py
-            └── lbweb.py
+            ├── common.py
+            ├── lbweb.py
+            └── rsi.py
 ```
 
 Restart Home Assistant after copying.
@@ -59,7 +62,7 @@ Restart Home Assistant after copying.
 
 1. Go to **Settings** → **Devices & Services** → **Add Integration**
 2. Search for **ISP Balance**
-3. Select your provider (NTS Center or Parus Telecom)
+3. Select your provider (NTS Center, Parus Telecom, or RSI-Net)
 4. Enter your billing portal login and password
 5. The integration validates your credentials against the portal and creates a balance sensor
 
@@ -75,6 +78,18 @@ Restart Home Assistant after copying.
 
 The sensor uses `SensorDeviceClass.MONETARY`, so HA displays it with proper currency formatting and records history for graphing.
 
+RSI-Net additionally exposes what its cabinet publishes:
+
+| Attribute | Example |
+|-----------|---------|
+| `login` | `v158-197` |
+| `blocking` | `Интернет доступен` |
+| `tariff` | `1390 руб - 250 Мбит - ЧС-2026` |
+| `next_charge_date` | `01.08.2026` |
+| `total_cost` | `1 390,00 р.` |
+
+The cabinet also publishes the subscriber's name, address and phone number. These are deliberately **not** exposed — entity attributes are written to the recorder database and visible throughout the UI.
+
 ## Adding a New LbWeb Provider
 
 All LbWeb-based ISPs share the same authentication flow and page structure. To add a new one:
@@ -87,11 +102,17 @@ All LbWeb-based ISPs share the same authentication flow and page structure. To a
        MY_NEW_ISP = "my_new_isp"  # <-- add this
    ```
 
-2. Add the display name to `PROVIDER_DISPLAY_NAMES` in `const.py`:
+2. Add the display name to `PROVIDER_DISPLAY_NAMES` and the platform to
+   `PROVIDER_BILLING_SYSTEMS` in `const.py`:
    ```python
    PROVIDER_DISPLAY_NAMES: dict[ProviderId, str] = {
        ...
        ProviderId.MY_NEW_ISP: "My New ISP",
+   }
+
+   PROVIDER_BILLING_SYSTEMS: dict[ProviderId, str] = {
+       ...
+       ProviderId.MY_NEW_ISP: "LbWeb",
    }
    ```
 
@@ -103,7 +124,17 @@ All LbWeb-based ISPs share the same authentication flow and page structure. To a
    ),
    ```
 
+4. Add the option label to `strings.json` and both `translations/*.json`.
+
 No new files or classes needed — all LbWeb portals use identical selectors and auth flow.
+
+## Adding a Non-LbWeb Provider
+
+Providers on other billing platforms need their own module implementing the
+`ISPProvider` interface from `providers/base.py` — see `providers/rsi.py` for a
+worked example. Reusable HTTP and number-parsing helpers live in
+`providers/common.py`. Register the new class in `get_provider()` in
+`providers/__init__.py`, then follow steps 1, 2, and 4 above.
 
 ## License
 

@@ -8,21 +8,22 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from dataclasses import dataclass
 from urllib.parse import unquote
 
-import aiohttp
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 
 from .base import AuthenticationError, AuthResult, BalanceData, ISPProvider
+from .common import (
+    USER_AGENT,
+    build_cookie_header,
+    clean_text,
+    extract_direct_text,
+    new_session,
+    parse_balance,
+)
 
 _LOGGER = logging.getLogger(__name__)
-
-USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
-)
 
 
 # ---------------------------------------------------------------------------
@@ -77,54 +78,6 @@ SELECTORS = LbWebSelectors(
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _clean_text(el: Tag) -> str:
-    """Extract text from a BS4 element, normalizing whitespace."""
-    return el.get_text().replace("\xa0", " ").replace("  ", " ").strip()
-
-
-def _extract_direct_text(el: Tag) -> str | None:
-    """Extract only direct text nodes from an element (skip child tags)."""
-    parts = [
-        part.strip()
-        for part in el.find_all(string=True, recursive=False)
-        if part.strip()
-    ]
-    return " ".join(parts) if parts else None
-
-
-_BALANCE_RE = re.compile(r"[^\d.,\-]")
-
-
-def _parse_balance(raw: str) -> float:
-    """Parse a locale-formatted balance string into a float.
-
-    Handles formats like '1 234.56 руб.', '1234,56', '-100.00'.
-    """
-    cleaned = _BALANCE_RE.sub("", raw)
-    # Normalize comma-as-decimal-separator (European/Russian locale)
-    cleaned = cleaned.replace(",", ".")
-    return float(cleaned)
-
-
-def _build_cookie_header(cookies: dict[str, str]) -> str:
-    return "; ".join(f"{k}={v}" for k, v in cookies.items())
-
-
-def _new_session() -> aiohttp.ClientSession:
-    """Create a private session with DummyCookieJar.
-
-    HA's shared session uses a real CookieJar that intercepts Set-Cookie
-    headers, causing resp.cookies to be empty. We need our own session
-    to reliably extract cookies from responses.
-    """
-    return aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar())
-
-
-# ---------------------------------------------------------------------------
 # Provider implementation
 # ---------------------------------------------------------------------------
 
@@ -144,7 +97,7 @@ class LbWebProvider(ISPProvider):
         username: str,
         password: str,
     ) -> AuthResult:
-        async with _new_session() as session:
+        async with new_session() as session:
             headers = {"User-Agent": USER_AGENT}
 
             # Step 1: GET login page — obtain CSRF token and initial cookies.
@@ -176,7 +129,7 @@ class LbWebProvider(ISPProvider):
             async with session.post(
                 self._endpoints.sign_in,
                 data=form_data,
-                headers={**headers, "Cookie": _build_cookie_header(cookies)},
+                headers={**headers, "Cookie": build_cookie_header(cookies)},
                 allow_redirects=False,
             ) as resp:
                 if 400 <= resp.status < 500:
@@ -197,10 +150,10 @@ class LbWebProvider(ISPProvider):
         cookies: dict[str, str] = json.loads(auth_token)
         headers = {
             "User-Agent": USER_AGENT,
-            "Cookie": _build_cookie_header(cookies),
+            "Cookie": build_cookie_header(cookies),
         }
 
-        async with _new_session() as session:
+        async with new_session() as session:
             async with session.get(
                 self._endpoints.dashboard, headers=headers, allow_redirects=False
             ) as resp:
@@ -228,8 +181,8 @@ class LbWebProvider(ISPProvider):
         if balance_el is None:
             raise ValueError("Balance element not found on dashboard page")
 
-        raw_balance = _clean_text(balance_el)
-        balance = _parse_balance(raw_balance)
+        raw_balance = clean_text(balance_el)
+        balance = parse_balance(raw_balance)
 
         overdraft_el = soup.select_one(SELECTORS.overdraft)
         operator_el = soup.select_one(SELECTORS.operator)
@@ -238,10 +191,10 @@ class LbWebProvider(ISPProvider):
         return BalanceData(
             balance=balance,
             currency="RUB",
-            overdraft=_clean_text(overdraft_el) if overdraft_el else None,
-            operator=_clean_text(operator_el) if operator_el else None,
+            overdraft=clean_text(overdraft_el) if overdraft_el else None,
+            operator=clean_text(operator_el) if operator_el else None,
             notification=(
-                _extract_direct_text(notification_el)
+                extract_direct_text(notification_el)
                 if notification_el
                 else None
             ),
